@@ -1,0 +1,9 @@
+recordings/*
+*.json
+*.pyc
+*.ply
+*.pcd
+*.csv
+*.png
+/**/*/graph
+*.npy
