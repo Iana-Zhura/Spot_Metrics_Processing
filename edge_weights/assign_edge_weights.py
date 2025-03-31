@@ -11,6 +11,25 @@ BASE_PTH = os.getcwd()
 #############################
 # Helper Functions
 #############################
+def load_transformation_params(trans_json_path):
+    """
+    Load transformation parameters from a JSON file."
+    """
+    import json
+    # Check if the file exists
+    
+    with open(trans_json_path, 'r') as f:
+        loaded_json = json.load(f)
+    
+    # Check if the loaded JSON has the expected keys
+    required_keys = ["rotation_z", "rotation_y", "translation"]
+    for key in required_keys:
+        if key not in loaded_json:
+            raise KeyError(f"Missing key '{key}' in the loaded JSON.")
+    
+    return loaded_json
+
+
 def load_map(path):
     """
     Load a graph from the given file path.
@@ -81,6 +100,8 @@ def load_metrics(metrics_file_path, anchor_ids=None, metric_key="average_effort"
         numeric_keys = False
 
     if numeric_keys and anchor_ids is not None:
+        # this is the default case
+        # sort the keys numerically and assign weights to the corresponding anchor IDs
         for key in sorted(data.keys(), key=lambda k: int(k)):
             info = data[key]
             weight = float(info.get(metric_key, 0))
@@ -95,6 +116,8 @@ def load_metrics(metrics_file_path, anchor_ids=None, metric_key="average_effort"
         for waypoint_key, info in data.items():
             anchor_id = info.get("waypoint_id")
             weight = float(info.get(metric_key, 0))
+            if weight == 0:
+                print(f"Warning: Weight for {waypoint_key} is 0. Very likely because the metric key was not present in the JSON.")
             if anchor_id is not None:
                 metrics[anchor_id] = weight
     return metrics
@@ -318,6 +341,15 @@ def export_edge_values_to_file(edge_data, output_file):
     """
     Export computed edge values to a JSON file.
     """
+    # if folder does not exist, create it
+    if not os.path.exists(os.path.dirname(output_file)):
+        os.makedirs(os.path.dirname(output_file))
+    
+    # if file exists, overwrite it
+    if os.path.exists(output_file):
+        print(f"File {output_file} already exists. Overwriting.")
+        os.remove(output_file)
+
     with open(output_file, "w") as f:
         json.dump(edge_data, f, indent=2)
     print(f"Exported edge values to {output_file}")
@@ -513,9 +545,10 @@ def build_cost_graph(edge_values):
 #############################
 if __name__ == "__main__":
     
-    prefix = "greenhouse_march"
+    prefix = "greenhouse_very_final"
     # Paths
-
+    # for old versions
+    output_file = f"{BASE_PTH}/edge_weights/{prefix}_edge_values.json"
     if prefix == "greenhouse_final":
         sdk_graph_path = "/media/martin/Elements/ros-recordings/recordings/greenhouse_final/downloaded_graph/"
         metrics_file = "/media/martin/Elements/ros-recordings/metrics_assigned_to_time/greenhouse_final_metrics.json"
@@ -549,9 +582,21 @@ if __name__ == "__main__":
         rotation_z = 205
         rotation_y = -1.5
         translation = [2.25, -0.8, -0.45]
+    
+    elif prefix == "greenhouse_very_final":
+        sdk_graph_path = "/media/martin/Elements/ros-recordings/recordings_final/greenhouse/recordings/downloaded_graph"
+        metrics_file = "/media/martin/Elements/ros-recordings/recordings_final/greenhouse/processings/metrics_to_time/greenhouse_time_metrics.json"
+        ply_path = "/media/martin/Elements/ros-recordings/recordings_final/greenhouse/processings/merged_cloud_selected_large.pcd"
+        transformation_path = "/media/martin/Elements/ros-recordings/recordings_final/greenhouse/processings/fit_odometry/transformation_params.json"
 
+        tranformation = load_transformation_params(transformation_path)
+        rotation_z = tranformation["rotation_z"]
+        rotation_y = tranformation["rotation_y"]
+        translation = tranformation["translation"]
 
-    output_file = f"{BASE_PTH}/edge_weights/{prefix}_edge_values.json"
+        output_file = "/media/martin/Elements/ros-recordings/recordings_final/greenhouse/processings/edge_weights/greenhouse_edge_values.json"
+    else:
+        raise ValueError("Invalid prefix. Please provide a valid prefix for the data.")
 
     os.environ['XDG_SESSION_TYPE'] = 'x11'
 

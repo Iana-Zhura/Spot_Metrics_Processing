@@ -25,6 +25,12 @@ def main(output_dir, bag_pth):
     reader = SequentialReader()
     reader.open(storage_options, converter_options)
 
+    # make sure the output directory exists
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+    print(f"Reading bag file: {bag_pth}")
+    print(f"Writing CSV files to: {output_dir}")
+
     # Prepare CSV files and their writers
     # 1) battery_states.csv: one row per BatteryState in the array
     battery_csv_path = os.path.join(output_dir, "battery_states.csv")
@@ -212,13 +218,17 @@ def main(output_dir, bag_pth):
 
 if __name__ == '__main__':
 
-    bag_name = "greenhouse_march"
+    bag_name = "greenhouse_final"
+
     if bag_name == "greenhouse_march":
         save_folder = "/media/martin/Elements/ros-recordings/recordings/march_11/metrics_csvs"
         bag_path = "/media/martin/Elements/ros-recordings/recordings/march_11/ros2_bag/march11_greenhouse_0.db3"
     elif bag_name == "greenhouse_feb":
         save_folder = "/media/martin/Elements/ros-recordings/recordings/feb_27/greenhouse_feb/greenhouse_feb_csvs"
         bag_path = "/media/martin/Elements/ros-recordings/recordings/feb_27/greenhouse_feb/greenhouse_feb_ros2bag/greenhouse_feb_0.db3"
+    elif bag_name == "greenhouse_final":
+        save_folder = "/media/martin/Elements/ros-recordings/recordings_final/greenhouse/processings/metrics_csvs"
+        bag_path = "/media/martin/Elements/ros-recordings/recordings_final/greenhouse/recordings/march24_ros2/march24_v1_0.db3"
 
         
 

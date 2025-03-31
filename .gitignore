@@ -5,5 +5,13 @@ recordings/*
 *.pcd
 *.csv
 *.png
+*.bag
+*.db3
+**/metadata.yaml
 /**/*/graph
 *.npy
+odometry/view_odometry_47s.py
+fit_sdk_odometry/iana_simulate_path.py
+recordings_final/greenhouse/recordings/march24_greenhouse.bag
+**/edge_snapshots/*
+**/waypoint_snapshots/*

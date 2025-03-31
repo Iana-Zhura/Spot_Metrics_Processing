@@ -9,6 +9,25 @@ import open3d as o3d
 #############################
 # Helper Functions
 #############################
+
+def load_transformation_params(trans_json_path):
+    """
+    Load transformation parameters from a JSON file."
+    """
+    import json
+    # Check if the file exists
+    
+    with open(trans_json_path, 'r') as f:
+        loaded_json = json.load(f)
+    
+    # Check if the loaded JSON has the expected keys
+    required_keys = ["rotation_z", "rotation_y", "translation"]
+    for key in required_keys:
+        if key not in loaded_json:
+            raise KeyError(f"Missing key '{key}' in the loaded JSON.")
+    
+    return loaded_json
+
 def load_map(path):
     """
     Load a graph from the given directory path.
@@ -211,7 +230,7 @@ def visualize_graph_with_pointcloud(point_cloud, edges, anchor_map, edge_radius=
 #############################
 if __name__ == "__main__":
     # Choose dataset and set paths/parameters.
-    prefix = "greenhouse_march"
+    prefix = "greenhouse_very_final"
     # sdk_graph_path = '/media/martin/spot_extern/martin/new_graphs/greenhouse_final/edge_by_hand'
     sdk_graph_path = "/media/martin/Elements/ros-recordings/edge_weights/updated_graphs"
     
@@ -235,6 +254,17 @@ if __name__ == "__main__":
         rotation_z = 205
         rotation_y = -1.5
         translation = [2.25, -0.8, -0.45]
+    elif prefix == "greenhouse_very_final":
+        ply_path = "/media/martin/Elements/ros-recordings/recordings_final/greenhouse/processings/merged_cloud_selected_large.pcd"
+        trans_path = "/media/martin/Elements/ros-recordings/recordings_final/greenhouse/processings/fit_odometry/transformation_params.json"
+        sdk_graph_path = "/media/martin/Elements/ros-recordings/recordings_final/greenhouse/processings/updated_graph"
+
+        transformation = load_transformation_params(trans_path)
+        rotation_z = transformation["rotation_z"]
+        rotation_y = transformation["rotation_y"]
+        translation = transformation["translation"]
+    else:
+        raise ValueError("Unknown prefix. Please set the correct prefix for your dataset.")
     
     os.environ['XDG_SESSION_TYPE'] = 'x11'
     

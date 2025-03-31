@@ -53,7 +53,7 @@ def process_rosbag(input_bag, odometry_output_file):
 
 if __name__ == "__main__":
 
-    experiment = "greenhouse_march"
+    experiment = "greenhouse_march_final"
 
     if experiment == "imtek":
         odometry_csv_file = "/root/shared_folder/ros-recordings/recordings/feb_27/RERECORDED/rerecorded_imtek/imtek_feb_odo.csv"
@@ -67,5 +67,9 @@ if __name__ == "__main__":
     elif experiment == "greenhouse_march":
         odometry_csv_file = "/root/shared_folder/ros-recordings/recordings/march_11/greenhouse_march_odo.csv"
         bag_path = "/root/shared_folder/ros-recordings/recordings/march_11/march11_greenhouse.bag"
-
+    elif experiment == "greenhouse_march_final":    
+        odometry_csv_file = "/root/shared_folder/ros-recordings/recordings_final/greenhouse/processings/odometry_greenhouse.csv"
+        bag_path = "/root/shared_folder/ros-recordings/recordings_final/greenhouse/recordings/march24_greenhouse.bag"
+    else:
+        raise ValueError("Required arguments not provided!")
     process_rosbag(bag_path, odometry_csv_file)

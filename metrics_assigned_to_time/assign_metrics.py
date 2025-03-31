@@ -218,15 +218,24 @@ def timebins_metrics(merged_filename, odometry_filename, joint_states_filename, 
 
 if __name__ == "__main__":
   # Filenames - update these paths as necessary.
-  prefix = "greenhouse_final"
+  prefix = "greenhouse_very_final"
 
-  merged_filename = "../fit_sdk_odometry/merged_time_intervals.json"
-  odometry_filename = "../odometry/greenhouse_odo.csv"
-  joint_states_filename = "../recordings/greenhouse_final/greenhouse_final_csvs/joint_states.csv"
-  save_filename = f"{prefix}_metrics.json"
-  
+  if prefix == "greenhouse_final":
+    merged_filename = "../fit_sdk_odometry/merged_time_intervals.json"
+    odometry_filename = "../odometry/greenhouse_odo.csv"
+    joint_states_filename = "../recordings/greenhouse_final/greenhouse_final_csvs/joint_states.csv"
+    save_filename = f"{prefix}_metrics.json"
+
+    output_pth = f"{prefix}_waypoint_energy_distance_results.json"
+  elif prefix == "greenhouse_very_final":
+    joint_states_filename = "/media/martin/Elements/ros-recordings/recordings_final/greenhouse/processings/metrics_csvs/joint_states.csv"
+    odometry_filename = "/media/martin/Elements/ros-recordings/recordings_final/greenhouse/processings/odometry_greenhouse.csv"
+    merged_filename = "/media/martin/Elements/ros-recordings/recordings_final/greenhouse/processings/fit_odometry/greenhouse_final_fit_output.json"
+
+    output_pth = "/media/martin/Elements/ros-recordings/recordings_final/greenhouse/processings/metrics_to_time/greenhouse_time_metrics.json"
+
   timebins_metrics(merged_filename=merged_filename,
                     odometry_filename=odometry_filename,
                     joint_states_filename=joint_states_filename,
-                    output_pth="waypoint_energy_distance_results.json",
+                    output_pth= output_pth,
                     logging=True)

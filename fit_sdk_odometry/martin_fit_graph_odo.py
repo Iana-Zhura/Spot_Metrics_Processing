@@ -207,6 +207,16 @@ def export_merged_timestamps(merged_mapping, output_filename):
             "overall_time": sum(end - start for start, end in intervals)
         }
     
+    # check if the file already exists
+    if os.path.exists(output_filename):
+        print(f"Warning: '{output_filename}' already exists. Overwriting.")
+    
+    # if folder does not exist, create it
+    output_dir = os.path.dirname(output_filename)
+    if not os.path.exists(output_dir):
+        print(f"Creating directory '{output_dir}'")
+        os.makedirs(output_dir)
+
     with open(output_filename, "w") as f:
         json.dump(export_data, f, indent=2)
     print(f"\nExported merged time intervals to '{output_filename}'")
@@ -310,7 +320,7 @@ def fit_graph2odo(graph_pth, odometry_pth, pc_pth, export_pth, rotation_z=140, r
         print_merged_timestamps(discretized_waypoint_mapping)
     export_merged_timestamps(discretized_waypoint_mapping, export_pth)
 
-    input("Press Enter to visualize the point cloud with anchors and colored odometry bins")
+    # input("Press Enter to visualize the point cloud with anchors and colored odometry bins")
     visualize_point_cloud_with_anchors_open3d(points_origin, anchors_transformed, refined_waypoint_odometry_mapping)
 
 def save_anchor_waypoint_mapping(anchors_dict, output_filename):
@@ -323,11 +333,24 @@ def save_anchor_waypoint_mapping(anchors_dict, output_filename):
         json.dump(mapping, f, indent=2)
     print(f"Saved anchor-waypoint mapping to '{output_filename}'")
 
+def save_transformation_params(rotation_z, rotation_y, translation, output_filename):
+    """
+    Save the transformation parameters to a JSON file.
+    """
+    transformation_params = {
+        "rotation_z": rotation_z,
+        "rotation_y": rotation_y,
+        "translation": translation
+    }
+    with open(output_filename, "w") as f:
+        json.dump(transformation_params, f, indent=2)
+    print(f"Saved transformation parameters to '{output_filename}'")
+
 # Main block:
 if __name__ == "__main__":
 
     os.environ['XDG_SESSION_TYPE'] = 'x11'
-    prefix = "greenhouse_march"
+    prefix = "greenhouse_very_final"
 
     if prefix=="greenhouse_final":
         sdk_graph = load_map(f'/media/martin/Elements/ros-recordings/recordings/{prefix}/downloaded_graph')
@@ -336,6 +359,7 @@ if __name__ == "__main__":
 
         id_map_path = f"fit_sdk_odometry/{prefix}_id_map.json"
         save_file = f"fit_sdk_odometry/{prefix}_fit_output.json"
+        transformation_path = f"fit_sdk_odometry/{prefix}_transformation_params.json"
 
         rotation_z = 140
         rotation_y = -5
@@ -344,8 +368,10 @@ if __name__ == "__main__":
         sdk_graph = load_map("/media/martin/Elements/ros-recordings/recordings/feb_27/greenhouse_feb/graph_data/downloaded_graph")
         odometry_csv = "/media/martin/Elements/ros-recordings/recordings/feb_27/RERECORDED/rerecorded_greeenhouse_feb/odo_greenhouse_feb.csv"
         ply_path = "/media/martin/Elements/ros-recordings/recordings/feb_27/RERECORDED/rerecorded_greeenhouse_feb/merged_cloud_selected.pcd"
+
         id_map_path = "fit_sdk_odometry/greenhouse_feb_id_map.json"
         save_file = "fit_sdk_odometry/greenhouse_feb_fit_output.json"
+        transformation_path = "fit_sdk_odometry/greenhouse_feb_transformation_params.json"
         
         rotation_z = 171
         rotation_y = -5
@@ -354,8 +380,10 @@ if __name__ == "__main__":
         sdk_graph = load_map("/media/martin/Elements/ros-recordings/recordings/feb_27/campus_imtek/downloaded_graph")
         odometry_csv = "/media/martin/Elements/ros-recordings/recordings/feb_27/RERECORDED/rerecorded_imtek/imtek_feb_odo.csv"
         ply_path = "/media/martin/Elements/ros-recordings/recordings/feb_27/RERECORDED/rerecorded_imtek/merged_cloud_selected.pcd"
+        
         id_map_path = "fit_sdk_odometry/imtek_id_map.json"
         save_file = "fit_sdk_odometry/imtek_fit_output.json"
+        transformation_path = "fit_sdk_odometry/imtek_transformation_params.json"
         
         rotation_z = 162
         rotation_y = 1
@@ -365,13 +393,29 @@ if __name__ == "__main__":
         sdk_graph = load_map("/media/martin/Elements/ros-recordings/recordings/march_11/downloaded_graph")
         odometry_csv = "/media/martin/Elements/ros-recordings/recordings/march_11/greenhouse_march_odo.csv"
         ply_path = "/media/martin/Elements/ros-recordings/recordings/march_11/merged_cloud_selected.pcd"
+        
         id_map_path = "fit_sdk_odometry/greenhouse_march_id_map.json"
         save_file = "fit_sdk_odometry/greenhouse_march_fit_output.json"
+        transformation_path = "fit_sdk_odometry/greenhouse_march_transformation_params.json"
 
         rotation_z = 205
         rotation_y = -1.5
         translation = [2.25, -0.8, -0.45]
+    
+    elif prefix == "greenhouse_very_final":
+        sdk_graph = load_map("/media/martin/Elements/ros-recordings/recordings_final/greenhouse/recordings/downloaded_graph")
+        odometry_csv = "/media/martin/Elements/ros-recordings/recordings_final/greenhouse/processings/odometry_greenhouse.csv"
+        ply_path = "/media/martin/Elements/ros-recordings/recordings_final/greenhouse/processings/merged_cloud_selected_large.pcd"
+        
+        id_map_path = "/media/martin/Elements/ros-recordings/recordings_final/greenhouse/processings/fit_odometry/greenhouse_final_id_map.json"
+        save_file = "/media/martin/Elements/ros-recordings/recordings_final/greenhouse/processings/fit_odometry/greenhouse_final_fit_output.json"
+        transformation_path = "/media/martin/Elements/ros-recordings/recordings_final/greenhouse/processings/fit_odometry/transformation_params.json"
 
+        rotation_z = 186
+        rotation_y = -3.0
+        translation = [2.1, -1.25, -0.3]
+    else:
+        raise ValueError(f"Unknown prefix '{prefix}'")
 
     points = o3d.io.read_point_cloud(ply_path)
     points_origin = np.asarray(points.points)
@@ -395,3 +439,6 @@ if __name__ == "__main__":
 
     # Save the anchor to coordinate mapping
     save_anchor_waypoint_mapping(anchors_dict, id_map_path)
+
+    # save the transformation parameters to a file
+    save_transformation_params(rotation_z, rotation_y, translation, transformation_path)

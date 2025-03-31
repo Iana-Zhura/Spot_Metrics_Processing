@@ -62,7 +62,10 @@ def plot_odometry(odometry_path):
 
 if __name__ == "__main__":
 
-    prefix = "imtek"
+    odometry_source = "greenhouse_final"
 
-    ODOMETRY_CSV = f"/media/martin/Elements/ros-recordings/recordings/feb_27/RERECORDED/{prefix}/{prefix}_feb_odo.csv"  # Replace with actual file path
-    plot_odometry(ODOMETRY_CSV)
+    if odometry_source == "imtek":
+        odometry_path = f"/media/martin/Elements/ros-recordings/recordings/feb_27/RERECORDED/{odometry_source}/{odometry_source}_feb_odo.csv"  # Replace with actual file path
+    elif odometry_source == "greenhouse_final":
+        odometry_path = "/media/martin/Elements/ros-recordings/recordings_final/greenhouse/processings/odometry_greenhouse.csv"
+    plot_odometry(odometry_path)

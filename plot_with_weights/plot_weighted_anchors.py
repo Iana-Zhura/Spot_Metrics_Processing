@@ -82,8 +82,9 @@ def plot_anchors_weights_2d(map_path, odometry_file, weights_file, rotation_z=14
     # Apply transformation (same as used during export)
     anchors_transformed = apply_transformations(anchors_dict, rotation_z, rotation_y, translation)
     
-    # Original order for most plots
-    anchor_ids = list(anchors_transformed.keys())
+    # Use creation order for the anchor IDs
+    ordered_ids = order_waypoints_ids(sdk_graph)
+    anchor_ids = [aid for aid in ordered_ids if aid in anchors_transformed]
     anchor_coords_arr = np.array([anchors_transformed[aid] for aid in anchor_ids])
     
     # Load odometry data and extract positions (assuming columns 1-3 are x,y,z)
@@ -94,15 +95,19 @@ def plot_anchors_weights_2d(map_path, odometry_file, weights_file, rotation_z=14
     with open(weights_file, 'r') as f:
         waypoint_results = json.load(f)
     
-    # Extract metrics from JSON for each anchor in the original order
+    # Extract metrics from JSON for each anchor in the ordered list
     overall_time_values = np.array([waypoint_results.get(aid, {}).get("time_spent", 0.0) for aid in anchor_ids])
     energy_values = np.array([waypoint_results.get(aid, {}).get("energy", 0.0) for aid in anchor_ids])
     average_effort_values = np.array([waypoint_results.get(aid, {}).get("average_effort", 0.0) for aid in anchor_ids])
     distance_from_wp0 = np.linalg.norm(anchor_coords_arr[:, :2] - anchor_coords_arr[0, :2], axis=1)
     
     # Create a mapping from waypoint string ID to an integer based on creation time
-    ordered_ids = order_waypoints_ids(sdk_graph)
     creation_order = {aid: idx for idx, aid in enumerate(ordered_ids)}
+
+    # print the ordered IDs
+    print("\nOrdered Waypoint IDs based on creation time:")
+    for idx, aid in enumerate(ordered_ids):
+        print(f"ID {idx}: {aid}")
     
     # Create a figure with four subplots (4 rows)
     fig, axs = plt.subplots(4, 1, figsize=(8, 24))
@@ -152,7 +157,7 @@ def plot_anchors_weights_2d(map_path, odometry_file, weights_file, rotation_z=14
                          s=100,
                          edgecolor='k')
     # Use the creation order for the first anchor as reference (should be 0)
-    title_anchor_order = creation_order.get(anchor_ids[0], 0)
+    title_anchor_order = creation_order.get(ordered_ids[0], 0)
     axs[2].set_title('Distance from Anchor ' + str(title_anchor_order))
     axs[2].set_xlabel('X')
     axs[2].set_ylabel('Y')

@@ -4,6 +4,7 @@ import numpy as np
 import networkx as nx
 from bosdyn.api.graph_nav import map_pb2
 from bosdyn.client.recording import GraphNavRecordingServiceClient
+from bosdyn.client.math_helpers import SE3Pose
 
 ############################
 # Load/Save Graph Helpers #
@@ -191,8 +192,6 @@ def compute_relative_transform_from_anchors(graph, from_wp_id, to_wp_id):
         "rotation": rotation
     }
 
-from bosdyn.client.math_helpers import SE3Pose
-
 def compute_relative_transform_from_anchors_sdk(graph, from_wp_id, to_wp_id):
     """
     Compute the relative transform between two waypoints using the corresponding anchor transforms.
@@ -257,7 +256,6 @@ def generate_new_edge(graph, from_id, to_id, cost):
     new_edge.from_tform_to.rotation.w = relative_transform["rotation"]["w"]
     
     return new_edge
-
 
 ###########################
 # Live (RPC) Edge Creation
