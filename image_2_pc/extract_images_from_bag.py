@@ -104,7 +104,7 @@ def process_bag(bag_file, output_dir, selected_indices, pc_topic="/ouster/points
 
             o3d_cloud = o3d.geometry.PointCloud()
             o3d_cloud.points = o3d.utility.Vector3dVector(cloud)
-            pc_filename = os.path.join(pair_folder, "pointcloud.pcd")
+            pc_filename = os.path.join(pair_folder, f"{pc_time}.pcd")
             o3d.io.write_point_cloud(pc_filename, o3d_cloud)
             print(f"Saved point cloud to {pc_filename}")
 
@@ -115,7 +115,7 @@ def process_bag(bag_file, output_dir, selected_indices, pc_topic="/ouster/points
                 print(f"Error converting image for point cloud {pc_idx}: {e}")
                 continue
 
-            img_filename = os.path.join(pair_folder, "image.png")
+            img_filename = os.path.join(pair_folder, f"{pc_time}.png")
             cv2.imwrite(img_filename, cv_image)
             print(f"Saved image to {img_filename}")
 
@@ -149,7 +149,11 @@ if __name__ == "__main__":
         output_path = "/root/shared_folder/ros-recordings/recordings_final/greenhouse/processings/images"
         image_topic = "/camera_front_right_rect/image_rect"
         pc_topic = "/ouster/points"
-        pc_indexes = [325, 345, 445]
+        pc_indexes = [0, 20, 40, 60, 80, 100,
+                    120, 140, 160, 180, 200,
+                    220, 240, 260, 280, 300,
+                    325, 345, 360, 380, 400,
+                    420, 445, 460, 480]
         
         process_bag(
             bag_file=bag_path, 
