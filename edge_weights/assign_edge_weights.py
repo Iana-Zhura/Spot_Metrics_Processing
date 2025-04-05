@@ -6,6 +6,11 @@ from bosdyn.api.graph_nav import map_pb2
 from mpl_toolkits.mplot3d import Axes3D  # For 3D plotting
 import networkx as nx
 
+import open3d as o3d
+import numpy as np
+import matplotlib.cm as cm
+import matplotlib.colors as mcolors
+
 BASE_PTH = os.getcwd()
 
 #############################
@@ -28,7 +33,6 @@ def load_transformation_params(trans_json_path):
             raise KeyError(f"Missing key '{key}' in the loaded JSON.")
     
     return loaded_json
-
 
 def load_map(path):
     """
@@ -130,21 +134,6 @@ def calc_edge_value(anchor_id1, anchor_id2, metrics, pos1, pos2):
     metric_mean = (metrics.get(anchor_id1, 0) + metrics.get(anchor_id2, 0)) / 2.0
     edge_length = np.linalg.norm(np.array(pos1) - np.array(pos2))
     return metric_mean + edge_length
-
-def normalize_custom_edge(weight, min_val=9.856111604914917, max_val=13.907847872708492):
-    """
-    Compute the min and max values from a list of raw edge weights.
-    """
-
-    n_weight = (weight - min_val) / (max_val - min_val)
-
-    if n_weight > 1:
-        return 1
-    elif n_weight < 0:
-        return 0
-    else:
-        return n_weight
-    
 
 def normalize_edge_weights(raw_edges):
     """
@@ -268,7 +257,6 @@ def plot_edge_values_2d(edge_data, transformed_anchor_map, waypoint_to_numeric, 
     ax.grid(True)
     ax.set_aspect('equal', 'box')
     plt.show()
-
 
 #############################
 # Core Functions
@@ -397,11 +385,6 @@ def plot_edge_values(edge_data, transformed_anchor_map, waypoint_to_numeric, met
     set_axes_equal(ax)
     ax.legend()
     plt.show()
-
-import open3d as o3d
-import numpy as np
-import matplotlib.cm as cm
-import matplotlib.colors as mcolors
 
 def create_cylinder_between_points(p1, p2, radius, resolution=20, color=[0, 0, 1]):
     """
