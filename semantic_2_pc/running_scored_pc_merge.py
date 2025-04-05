@@ -2,76 +2,75 @@ import os
 import sys
 import numpy as np
 from PIL import Image
-import open3d as o3d
 import json
+import open3d as o3d  # Only used for visualization
+import matplotlib.cm as cm  # For color mapping
 
 # Add parent directory so modules can be imported
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from semantic_2_pc.project_semantic_2_pc import project_semantic_to_lidar, load_cam_config
+from semantic_2_pc.project_semantic_2_lidar import project_semantic_to_lidar, load_cam_config
 from image_2_pc.project_image_2_pc import create_adjustment_matrix
+
+def transform_points(points, transformation):
+    """
+    Transform an (N,3) array of points using a 4x4 transformation matrix.
+    """
+    N = points.shape[0]
+    ones = np.ones((N, 1), dtype=points.dtype)
+    points_hom = np.hstack((points, ones))  # (N,4)
+    transformed = (transformation @ points_hom.T).T[:, :3]
+    return transformed
 
 def iteration(semantic_array, lidar_pc, transformation, merged_cloud,
               camera_matrix, adjustment_matrix, cam2lidar):
     """
-    1. Use project_semantic_to_lidar to get a projection result (either fitness scores or points).
-    2. If the result is 1D (fitness scores), keep all lidar points.
-    3. Otherwise, use the projected 3D points directly.
-    4. Create a new Open3D point cloud from the selected points.
-    5. If this is not the first iteration, transform the new cloud using the provided transformation.
-    6. Merge the new point cloud with the existing merged cloud.
+    1. Call project_semantic_to_lidar to obtain semantic scores for each lidar point.
+    2. Only keep those lidar points that received a valid score.
+    3. If not the first iteration, transform these points using the provided transformation.
+    4. Merge the new valid points along with their scores (as the 4th column) into the merged cloud.
     
     Returns:
-        The updated merged Open3D point cloud.
+        Merged cloud as a NumPy array of shape (N,4), where columns 0:3 are coordinates and column 3 is the score.
     """
-    # Get projection result (could be fitness scores or a point cloud)
+    # Get the projection result (semantic scores)
     pc_trans = project_semantic_to_lidar(
         semantic_array, lidar_pc, camera_matrix, adjustment_matrix, cam2lidar,
         visualize=False, save_pc_pth=None
     )
     
-    print(f"Average fitness: {pc_trans.mean()}")
+    # Print average valid semantic score (ignoring points that remain unassigned, i.e. NaN)
+    print(f"Average valid fitness: {np.nanmean(pc_trans)}")
     
-    # If the output is 1D, assume it's a fitness score per lidar point.
-    # Instead of filtering based on a threshold, we keep all the lidar points.
-    if pc_trans.ndim == 1:
-        if lidar_pc.shape[0] != pc_trans.shape[0]:
-            raise ValueError(f"Mismatch between number of lidar points ({lidar_pc.shape[0]}) "
-                             f"and fitness scores ({pc_trans.shape[0]})")
-        new_cloud_points = lidar_pc
+    # Create a mask for valid points (i.e. those that got assigned a score)
+    valid_mask = ~np.isnan(pc_trans)
+    if np.count_nonzero(valid_mask) == 0:
+        print("No valid projected points found in this iteration; skipping.")
+        return merged_cloud
+    
+    # Select only the valid lidar points and corresponding scores
+    new_cloud_points = lidar_pc[valid_mask]
+    new_scores = pc_trans[valid_mask]
+    
+    # If merged_cloud already contains points, transform the new points into the common frame.
+    if merged_cloud.shape[0] > 0:
+        new_cloud_points = transform_points(new_cloud_points, transformation)
+    
+    # Combine the new points and their scores into one array (shape: [N,4])
+    new_cloud_with_scores = np.hstack((new_cloud_points, new_scores.reshape(-1, 1)))
+    
+    # Merge with previously accumulated points
+    if merged_cloud.shape[0] == 0:
+        merged = new_cloud_with_scores
     else:
-        # Otherwise, if a 2D array of points was returned, ensure it is (N,3)
-        if pc_trans.ndim == 2 and pc_trans.shape[0] == 3:
-            pc_trans = pc_trans.T
-        if pc_trans.ndim != 2 or pc_trans.shape[1] != 3:
-            raise ValueError(f"Unexpected shape for projected point cloud: {pc_trans.shape}")
-        new_cloud_points = pc_trans
-
-    # Create an Open3D point cloud from the selected points.
-    new_cloud = o3d.geometry.PointCloud()
-    new_cloud.points = o3d.utility.Vector3dVector(new_cloud_points)
-    
-    # If merged_cloud is not empty, transform new_cloud into the common frame.
-    if len(merged_cloud.points) > 0:
-        new_cloud.transform(transformation)
-    
-    # Merge: if merged_cloud is empty, use new_cloud; else, concatenate the points.
-    if len(merged_cloud.points) == 0:
-        merged = new_cloud
-    else:
-        merged_points = np.vstack((
-            np.asarray(merged_cloud.points),
-            np.asarray(new_cloud.points)
-        ))
-        merged = o3d.geometry.PointCloud()
-        merged.points = o3d.utility.Vector3dVector(merged_points)
+        merged = np.vstack((merged_cloud, new_cloud_with_scores))
     
     return merged
 
 def png_to_numpy(png_path):
     """
     Load a PNG image, resize to 224x224, convert to grayscale,
-    and normalize to [0, 1].
+    and normalize pixel values to [0, 1].
     """
     try:
         image = Image.open(png_path)
@@ -85,6 +84,7 @@ def png_to_numpy(png_path):
 def pcd_to_numpy(pcd_path):
     """
     Load a PCD file and convert it to a NumPy array.
+    (Uses Open3D for file reading only.)
     """
     try:
         pc = o3d.io.read_point_cloud(pcd_path)
@@ -94,7 +94,7 @@ def pcd_to_numpy(pcd_path):
 
 def trans_to_numpy(json_path):
     """
-    Load a JSON file and convert it to a transformation matrix (NumPy array).
+    Load a JSON file and convert it to a 4x4 transformation matrix (NumPy array).
     """
     try:
         with open(json_path, 'r') as f:
@@ -104,17 +104,23 @@ def trans_to_numpy(json_path):
         raise RuntimeError(f"Failed to load JSON from {json_path}: {e}")
 
 def load_fake_semantics():
-    # Initialize an empty merged point cloud (as an Open3D point cloud).
-    merged_cloud = o3d.geometry.PointCloud()
+    """
+    Process each 'pair_*' folder:
+      - Load the semantic image, lidar point cloud, and transformation.
+      - Compute the semantic projection and, if applicable, transform the valid points.
+      - Only keep points that received a valid semantic score.
+      - Merge the results into a common NumPy array with columns [x, y, z, score].
+    Finally, visualize the merged cloud using Open3D, coloring points based on their score.
+    """
+    # Initialize an empty merged cloud as a NumPy array with 4 columns (x, y, z, score)
+    merged_cloud = np.empty((0, 4), dtype=np.float32)
 
-    # ---------------------
-    # Load camera intrinsics and extrinsics.
+    # Load camera configuration.
     calib_file = "/media/martin/Elements/ros-recordings/recordings_final/greenhouse/configs/camera_front_right_2_lidar.json"
     cam2lidar, cam_intrisics = load_cam_config(calib_file)
     fx, fy, cx, cy = cam_intrisics
 
-    # --------------------
-    # Rescale camera intrinsics for semantic predictions at 224x224.
+    # Rescale camera intrinsics for 224x224.
     calib_height, calib_width = 1080, 1920
     scale_x = 224 / calib_width
     scale_y = 224 / calib_height
@@ -124,11 +130,8 @@ def load_fake_semantics():
         [0,            0,            1]
     ], dtype=np.float64)
     
-    # --------------------
-    # Define adjustment matrices (fix camera pose).
-    tx, ty, tz = 0.0, 0.0, 0.0
-    angle_x, angle_y, angle_z = 0.45, 0.0, 0.0
-    adjustment_matrix = create_adjustment_matrix(tx, ty, tz, angle_x, angle_y, angle_z)
+    # Define adjustment matrices (to fix camera pose).
+    adjustment_matrix = create_adjustment_matrix(0.0, 0.0, 0.0, 0.45, 0.0, 0.0)
     adjustment_matrix2 = create_adjustment_matrix(0.0, 0.0, 0.0, 0.0, -0.23, 0)
     adjustment_matrix = adjustment_matrix @ adjustment_matrix2
 
@@ -136,33 +139,50 @@ def load_fake_semantics():
     folders = os.listdir(base_path)
     for folder in folders:
         folder_path = os.path.join(base_path, folder)
-        # Process only folders that follow the "pair_" naming convention.
+        # Process only folders following the "pair_" naming convention.
         if os.path.isdir(folder_path) and folder.startswith("pair_"):
             print(f"Processing folder: {folder}")
-            # Load semantic image.
             semantic_path = os.path.join(folder_path, "semantic.png")
             semantic_array = png_to_numpy(semantic_path)
-            # Load lidar point cloud as a NumPy array.
+
             pc_path = os.path.join(folder_path, "pointcloud.pcd")
             lidar_pc = pcd_to_numpy(pc_path)
-            # Load transformation matrix.
+
             trans_path = os.path.join(folder_path, "transformation.json")
             transformation = trans_to_numpy(trans_path)
 
-            # Update the merged cloud using the iteration function.
+            # Update merged_cloud with only the valid new points and their semantic scores.
             merged_cloud = iteration(semantic_array, lidar_pc, transformation,
                                      merged_cloud, camera_matrix, adjustment_matrix, cam2lidar)
         else:
             print(f"Skipping non-directory item: {folder}")
 
-    # Visualize the final merged point cloud.
-    if len(merged_cloud.points) > 0:
-        print("Visualizing final merged point cloud...")
-        o3d.visualization.draw_geometries([merged_cloud])
+    # Final visualization: color points based on their semantic score.
+    if merged_cloud.shape[0] > 0:
+        points = merged_cloud[:, :3]
+        scores = merged_cloud[:, 3]
+
+        # Normalize scores to [0,1] for colormap mapping.
+        norm_scores = (scores - scores.min()) / (scores.max() - scores.min() + 1e-8)
+        colors = cm.get_cmap('viridis')(norm_scores)[:, :3]  # Get RGB from colormap
+
+        # Create an Open3D point cloud for visualization only.
+        pc = o3d.geometry.PointCloud()
+        pc.points = o3d.utility.Vector3dVector(points)
+        pc.colors = o3d.utility.Vector3dVector(colors)
+
+        print("Visualizing final merged point cloud with RGB colors based on semantic scores...")
+        o3d.visualization.draw_geometries([pc])
     else:
         print("No points in the merged cloud.")
+    
+    # save the merged cloud as numpy array
+    merged_cloud = merged_cloud.astype(np.float32)
+    merged_cloud_path = os.path.join(base_path, "merged_scored_cloud.npy")
+    np.save(merged_cloud_path, merged_cloud)
+    print(f"Saved merged cloud to {merged_cloud_path}")
 
+    
 if __name__ == "__main__":
     os.environ['XDG_SESSION_TYPE'] = 'x11'
-
     load_fake_semantics()
