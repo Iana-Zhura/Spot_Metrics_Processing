@@ -86,34 +86,46 @@ def create_adjustment_matrix(tx, ty, tz, angle_x, angle_y, angle_z):
     adjustment_matrix[:3, 3] = [tx, ty, tz]
     return adjustment_matrix
 
-
 def project_semantic_to_lidar(patch_scores, points, camera_matrix, adjustment_matrix, cam2lidar, visualize=False, save_pc_pth=None):
     """
     Project semantic scores from camera space to LiDAR point cloud space.
+    All computations use NumPy. By default, each point’s semantic score is set to NaN,
+    and only points that project within the image bounds receive a valid score.
+    
+    Args:
+        patch_scores: 2D NumPy array (grayscale image) of size (H,W) with values in [0,1].
+        points: (N,3) NumPy array of LiDAR points.
+        camera_matrix: 3x3 NumPy array with rescaled intrinsics.
+        adjustment_matrix: 4x4 NumPy array.
+        cam2lidar: 4x4 NumPy array representing the camera-to-LiDAR transformation.
+        visualize: if True, show a visualization (using Open3D and OpenCV).
+        save_pc_pth: path to save the visualization point cloud (only if visualize is True).
+    
+    Returns:
+        trans_fitness: A NumPy array of shape (N,) containing the semantic score for each point.
+                       Points that do not receive a valid projection remain as NaN.
     """
-
     target_height, target_width = patch_scores.shape
 
+    # Transform points from LiDAR frame to camera frame.
     inv_mat = np.linalg.inv(cam2lidar)
     cam_points = (inv_mat[:3, :3] @ points.T).T + inv_mat[:3, 3]
     
     homog_points = np.hstack((cam_points, np.ones((cam_points.shape[0], 1))))
     adjusted_points = (adjustment_matrix @ homog_points.T).T[:, :3]
 
-    # Project LiDAR points using the rescaled camera intrinsics.
+    # Project adjusted points using the rescaled camera intrinsics.
     uvw = (camera_matrix @ adjusted_points.T).T
     
-    # Here we compute two parallel arrays:
-    # trans_fitness: the raw semantic score for each point (from patch_scores)
-    # visual_colors: the heatmap color (for visualization)
-    trans_fitness = np.full((points.shape[0],), 0.5, dtype=np.float32)
+    # Initialize semantic scores as NaN (i.e. unassigned)
+    trans_fitness = np.full((points.shape[0],), np.nan, dtype=np.float32)
 
     if visualize:
+        import cv2
         visual_colors = np.tile(np.array([0.5, 0.5, 0.5]), (points.shape[0], 1))
         patch_scores_uint8 = (patch_scores * 255).astype(np.uint8)
         patch_heatmap = cv2.applyColorMap(patch_scores_uint8, cv2.COLORMAP_RAINBOW)
         patch_heatmap = cv2.cvtColor(patch_heatmap, cv2.COLOR_BGR2RGB)
-
 
     for i in range(points.shape[0]):
         z = uvw[i, 2]
@@ -123,33 +135,30 @@ def project_semantic_to_lidar(patch_scores, points, camera_matrix, adjustment_ma
             u_int = int(round(u))
             v_int = int(round(v))
             if 0 <= u_int < target_width and 0 <= v_int < target_height:
-                # Save the raw semantic score
                 trans_fitness[i] = patch_scores[v_int, u_int]
-                # For visualization, use the heatmap color
                 if visualize:
                     visual_colors[i] = patch_heatmap[v_int, u_int] / 255.0
 
     if visualize:
         final_pc = o3d.geometry.PointCloud()
         final_pc.points = o3d.utility.Vector3dVector(adjusted_points)
-        final_pc.colors = o3d.utility.Vector3dVector(visual_colors)    
-
-        # --------------------
-        # Create coordinate frames for visualization.
+        final_pc.colors = o3d.utility.Vector3dVector(visual_colors)
+        
         origin_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.5)
         transformed_frame = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.5)
         transformed_frame.transform(adjustment_matrix)
         
-        o3d.visualization.draw_geometries([
-            final_pc, origin_frame, transformed_frame
-        ], window_name="Semantic Projection on LiDAR")
-
-    if save_pc_pth is not None:
-        # Save the point cloud (visualization uses heatmap colors)
-        o3d.io.write_point_cloud(save_pc_pth, final_pc)
-        print(f"Saved LiDAR semantic point cloud to {save_pc_pth}")
+        o3d.visualization.draw_geometries(
+            [final_pc, origin_frame, transformed_frame],
+            window_name="Semantic Projection on LiDAR"
+        )
+        
+        if save_pc_pth is not None:
+            o3d.io.write_point_cloud(save_pc_pth, final_pc)
+            print(f"Saved LiDAR semantic point cloud to {save_pc_pth}")
 
     return trans_fitness
+
 
 def main():
     # --------------------
@@ -209,10 +218,7 @@ def main():
     # #6 Project semantic scores to LiDAR point cloud 
     trans_fitness_pc = project_semantic_to_lidar(patch_scores, lidar_pc, camera_matrix, adjustment_matrix, cam2lidar, visualize=True, save_pc_pth=output_file)
     # --------------------
-    # Optional: Save the projected semantic scores as a NumPy array in the same folder.
-    score_output_file = os.path.join(base, "projected_semantic_scores.npy")
-    np.save(score_output_file, trans_fitness_pc)
-    print(f"Saved projected semantic scores to {score_output_file}")
+
     
 if __name__ == "__main__":
     os.environ['XDG_SESSION_TYPE'] = 'x11'
