@@ -4,8 +4,10 @@ def normalize(value, min_value, max_value):
     """ Normalize a value to a [0, 1] scale. """
     return (value - min_value) / (max_value - min_value) if max_value > min_value else 0
 
-def calculate_average_cost(path, json_data_path, alpha=0.7):
-    """ Calculate a combined cost metric based on normalized effort and distance, loading data from a JSON file. """
+def calculate_average_cost_and_time(path, json_data_path, alpha=0.7):
+    """ 
+    Calculate a combined cost metric based on normalized effort and distance, and return total time spent separately, loading data from a JSON file. 
+    """
     # Load JSON data from the file
     with open(json_data_path, 'r') as file:
         json_data = json.load(file)
@@ -13,6 +15,7 @@ def calculate_average_cost(path, json_data_path, alpha=0.7):
     # Initialize variables to find min and max values for effort and distance
     min_effort, max_effort = float('inf'), float('-inf')
     min_distance, max_distance = float('inf'), float('-inf')
+    total_time_spent = 0  # To accumulate total time spent on the path
 
     # First pass: determine the ranges of effort and distance
     for waypoint, data in json_data.items():
@@ -21,6 +24,8 @@ def calculate_average_cost(path, json_data_path, alpha=0.7):
             max_effort = max(max_effort, data['average_effort'])
             min_distance = min(min_distance, data['distance'])
             max_distance = max(max_distance, data['distance'])
+            if 'time_spent' in data:
+                total_time_spent += data['time_spent']
 
     total_effort = 0
     total_distance = 0
@@ -44,5 +49,6 @@ def calculate_average_cost(path, json_data_path, alpha=0.7):
         average_cost = alpha * normalized_effort + (1 - alpha) * normalized_distance
     else:
         average_cost = 0
+        total_time_spent = 0  # Reset to 0 if no waypoints are processed
     
-    return average_cost
+    return average_cost, total_time_spent

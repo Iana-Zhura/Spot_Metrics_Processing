@@ -312,7 +312,60 @@ def plot_graph_2d(transformed_anchor_map, graph, primary_path, nth_path=None, nt
     ax.grid(True)
     # plt.show()
     return fig
-   
+
+
+def plot_comparison_paths(transformed_anchor_map, graph, chosen_path, min_cost_path, chosen_path_cost, min_cost_path_cost, log=False):
+    """
+    Plot the graph in 2D with:
+      - All anchors shown as red dots.
+      - All edges drawn in light gray without individual edge cost annotations.
+      - Chosen path highlighted in blue.
+      - Minimal cost path highlighted in green.
+      - Average costs for both paths displayed in the caption.
+      - Optionally log to wandb.
+    """
+    fig, ax = plt.subplots(figsize=(8, 6))
+
+    # Plot anchors
+    for aid, (x, y) in transformed_anchor_map.items():
+        ax.scatter(x, y, color='red', s=50)
+        ax.text(x, y, aid[:8], fontsize=8, color='black')
+
+    # Plot all edges
+    for edge in graph.edges:
+        u = edge.id.from_waypoint
+        v = edge.id.to_waypoint
+        if u in transformed_anchor_map and v in transformed_anchor_map:
+            x1, y1 = transformed_anchor_map[u]
+            x2, y2 = transformed_anchor_map[v]
+            ax.plot([x1, x2], [y1, y2], color='lightgray', alpha=0.5)
+
+    # Plot paths with respective colors
+    for path, color, label, cost in [(chosen_path, 'blue', 'Chosen Path', chosen_path_cost), 
+                                     (min_cost_path, 'green', 'Minimal Cost Path', min_cost_path_cost)]:
+        for i in range(len(path) - 1):
+            u, v = path[i], path[i + 1]
+            if u in transformed_anchor_map and v in transformed_anchor_map:
+                x1, y1 = transformed_anchor_map[u]
+                x2, y2 = transformed_anchor_map[v]
+                ax.plot([x1, x2], [y1, y2], color=color, linewidth=3, label=label if i == 0 else "")
+
+    # Annotate plot with path costs
+    ax.text(0.02, 0.95, f"Average Chosen Path Cost: {chosen_path_cost:.2f}", transform=ax.transAxes, fontsize=10, color='blue', verticalalignment='top')
+    ax.text(0.02, 0.90, f"Average Optimal Min Cost Path: {min_cost_path_cost:.2f}", transform=ax.transAxes, fontsize=10, color='green', verticalalignment='top')
+
+    ax.set_title("Graph Plot with Path Comparisons")
+    ax.set_xlabel("X")
+    ax.set_ylabel("Y")
+    ax.legend()
+    ax.grid(True)
+
+    # Log plot to wandb if logging is enabled
+    if log:
+        plt_path = "path_comparison_plot.png"
+        plt.savefig(plt_path)
+        plt.close()  # Close the plot to free up memory
+        wandb.log({"Comparison Plot": wandb.Image(plt_path)})
 
 
 ##################################
