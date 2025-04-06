@@ -1,5 +1,6 @@
 import os
 import json
+import wandb
 import networkx as nx
 import numpy as np
 import matplotlib.pyplot as plt
@@ -141,7 +142,19 @@ def get_nth_shortest_paths(G, start, goal, n):
             break
     return primary, nth
 
-
+def find_paths(graph, start, goal, path=[]):
+    path = path + [start]  # include the current node in the path
+    if start == goal:
+        return [path]  # if current node is goal, return path
+    if start not in graph:
+        return []  # if the node isn't in the graph, return empty list
+    paths = []  # list to store all paths
+    for node in graph[start]:
+        if node not in path:  # avoid cycles
+            newpaths = find_paths(graph, node, goal, path)  # recursive call
+            for newpath in newpaths:
+                paths.append(newpath)
+    return paths
 
 def main_shortest_path(graph_folder, start_index=None, goal_index=None, nth=2):
     """
@@ -169,9 +182,10 @@ def main_shortest_path(graph_folder, start_index=None, goal_index=None, nth=2):
         start, goal = ordered_ids[start_index], ordered_ids[goal_index]
     
     primary, nth_path = get_nth_shortest_paths(G, start, goal, nth)
+    all_paths = find_paths(G, start, goal)
     print(f"\nPrimary shortest path: {primary}")
     print(f"\n{nth}-th shortest path: {nth_path}")
-    return graph, primary, nth_path
+    return graph, primary, nth_path, all_paths
 
 
 ##################################
@@ -217,7 +231,7 @@ def transform_anchor_map(anchor_map, rotation_z, rotation_y, translation):
     return transformed
 
 
-def plot_graph_2d(transformed_anchor_map, graph, primary_path, nth_path=None, nth=None):
+def plot_graph_2d(transformed_anchor_map, graph, primary_path, nth_path=None, nth=None, log=False):
     """
     Plot the graph in 2D with:
       - All anchors shown as red dots with abbreviated IDs.
@@ -296,7 +310,9 @@ def plot_graph_2d(transformed_anchor_map, graph, primary_path, nth_path=None, nt
     ax.set_ylabel("Y")
     ax.legend()
     ax.grid(True)
-    plt.show()
+    # plt.show()
+    return fig
+   
 
 
 ##################################
