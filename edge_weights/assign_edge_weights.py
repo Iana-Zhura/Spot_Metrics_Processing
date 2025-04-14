@@ -126,7 +126,7 @@ def load_metrics(metrics_file_path, anchor_ids=None, metric_key="average_effort"
                 metrics[anchor_id] = weight
     return metrics
 
-def calc_edge_value(anchor_id1, anchor_id2, metrics, pos1, pos2):
+def calc_edge_value_add(anchor_id1, anchor_id2, metrics, pos1, pos2):
     """
     Calculate the raw edge weight as the mean of the two anchors' metric values plus
     the Euclidean distance between their positions.
@@ -134,6 +134,15 @@ def calc_edge_value(anchor_id1, anchor_id2, metrics, pos1, pos2):
     metric_mean = (metrics.get(anchor_id1, 0) + metrics.get(anchor_id2, 0)) / 2.0
     edge_length = np.linalg.norm(np.array(pos1) - np.array(pos2))
     return metric_mean + edge_length
+
+def calc_edge_value_mult(anchor_id1, anchor_id2, metrics, pos1, pos2):
+    """
+    Calculate the raw edge weight as the product of the Euclidean distance between
+    positions and the mean of the two anchors' metric values (effort).
+    """
+    metric_mean = (metrics.get(anchor_id1, 0) + metrics.get(anchor_id2, 0)) / 2.0
+    edge_length = np.linalg.norm(np.array(pos1) - np.array(pos2))
+    return metric_mean * edge_length
 
 def normalize_edge_weights(raw_edges):
     """
@@ -305,7 +314,8 @@ def compute_edge_values(graph, metrics_file, rotation_z=0, rotation_y=0, transla
         if from_id in transformed_anchor_map and to_id in transformed_anchor_map:
             pos1 = transformed_anchor_map[from_id]
             pos2 = transformed_anchor_map[to_id]
-            raw_weight = calc_edge_value(from_id, to_id, metrics, pos1, pos2)
+            #raw_weight = calc_edge_value_add(from_id, to_id, metrics, pos1, pos2) # Uncomment for addition
+            raw_weight = calc_edge_value_mult(from_id, to_id, metrics, pos1, pos2) # Uncomment for multiplication
             raw_edges.append((from_id, to_id, raw_weight))
     normalized_edges = normalize_edge_weights(raw_edges)
     
