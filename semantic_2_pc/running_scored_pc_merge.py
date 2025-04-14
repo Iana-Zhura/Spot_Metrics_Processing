@@ -40,7 +40,7 @@ def iteration(semantic_array, lidar_pc, transformation, merged_cloud,
     )
     
     # Print average valid semantic score (ignoring points that remain unassigned, i.e. NaN)
-    print(f"Average valid fitness: {np.nanmean(pc_trans)}")
+    # print(f"Average valid fitness: {np.nanmean(pc_trans)}")
     
     # Create a mask for valid points (i.e. those that got assigned a score)
     valid_mask = ~np.isnan(pc_trans)
